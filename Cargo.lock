@@ -292,6 +292,7 @@ name = "http-client"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "os-checker",
  "reqwest",
  "serde_json",
  "tokio",
@@ -532,6 +533,10 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
+
+[[package]]
+name = "os-checker"
+version = "0.1.0"
 
 [[package]]
 name = "parking_lot"

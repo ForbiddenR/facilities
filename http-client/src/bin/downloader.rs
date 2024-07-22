@@ -1,11 +1,13 @@
 use std::{env, error::Error, fs::File, io::Write};
 
 use futures_util::StreamExt;
+use os_checker::support_architecture_v3;
 use reqwest::{Client, Proxy};
 use serde_json::Value;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let support_v3 = support_architecture_v3()?;
     let repo_owner = env::var("REPOSITORY").expect("Don't find correct repo owner");
     let repo_name = env::var("REPOSITORY_NAME").expect("Don't find correct repo");
 
@@ -35,7 +37,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let asset = assets
         .into_iter()
         .find(|x| match x["browser_download_url"].as_str() {
-            Some(url) => url.contains("tar.gz") && url.contains("linux") && url.contains("amd64v3"),
+            Some(url) => {
+                (url.contains("tar.gz") && url.contains("linux") && url.contains("amd64v3") && support_v3)
+                || (url.contains("tar.gz") && url.contains("linux") && url.contains("amd64") && !support_v3)
+                    || (url.contains("zip") && url.contains("64") && url.contains("linux"))
+            }
             None => false,
         })
         .ok_or("No valid url in the assets")?;
