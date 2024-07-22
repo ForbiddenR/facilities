@@ -1,0 +1,9 @@
+[package]
+name = "facilities"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["http-client"]
+
+[dependencies]
