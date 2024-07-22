@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Some(url) => url.contains("tar.gz") && url.contains("linux") && url.contains("amd64v3"),
             None => false,
         })
-        .ok_or("No valid asset in the url")?;
+        .ok_or("No valid url in the assets")?;
     let url = asset["browser_download_url"]
         .as_str()
         .ok_or("No download URL found")?;
