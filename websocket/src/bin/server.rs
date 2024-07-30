@@ -23,7 +23,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, tx: Arc<broadcas
     let ws_stream = accept_async(stream).await.expect("Failed to accept");
     println!("New Websocket connection: {}", addr);
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-
+    
     let mut rx = tx.subscribe();
 
     loop {
