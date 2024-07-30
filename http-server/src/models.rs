@@ -1,5 +1,4 @@
-use std::time::SystemTime;
-
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
@@ -21,7 +20,7 @@ pub struct MyResponse {
     pub status: i32,
     pub rows: i32,
     pub msg: String,
-    pub timestamp: u64,
+    pub timestamp: i64,
 }
 
 impl MyResponse {
@@ -30,7 +29,7 @@ impl MyResponse {
             status,
             rows: 0,
             msg: msg.to_string(),
-            timestamp: SystemTime::now().elapsed().unwrap().as_secs(),
+            timestamp: Utc::now().timestamp(),
         }
     }
 }

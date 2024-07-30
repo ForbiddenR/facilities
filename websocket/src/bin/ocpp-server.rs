@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use futures_util::{stream::SplitSink, FutureExt, SinkExt, StreamExt};
+use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use rust_ocpp::v1_6::messages::boot_notification::{
     BootNotificationRequest, BootNotificationResponse,
 };

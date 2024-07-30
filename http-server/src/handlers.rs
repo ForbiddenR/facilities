@@ -1,6 +1,4 @@
-use std::time::SystemTime;
-
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 
 use crate::models::MyResponse;
 
@@ -12,8 +10,14 @@ async fn hello() -> impl Responder {
 }
 
 #[post("/test")]
-async fn tests(body: web::Json<MyRequest>) -> impl Responder {
-    let protocol = body.protocol.as_ref().unwrap();
+async fn tests(req: HttpRequest, body: web::Json<MyRequest>) -> impl Responder {
+    for (k, v) in req.headers() {
+        println!("key is {} and value is {}", k, v.to_str().unwrap());
+    }
+    let protocol = match &body.protocol {
+        Some(protocol) => protocol,
+        None => return HttpResponse::Ok().json(MyResponse::new(1, "no protocol message")),
+    };
     println!(
         "sn is {} and protocol is {:?}",
         body.equipment_sn, protocol
