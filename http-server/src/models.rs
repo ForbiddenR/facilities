@@ -11,8 +11,8 @@ pub struct MyRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct Protocol {
-    pub name: String,
-    pub version: String,
+    // pub name: String,
+    // pub version: String,
 }
 
 #[derive(Debug, Serialize)]

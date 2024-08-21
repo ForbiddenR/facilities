@@ -6,7 +6,7 @@ use rust_ocpp::v1_6::messages::boot_notification::{
 };
 use serde_json::Value;
 use tokio::sync::{mpsc, Mutex};
-use warp::{filters::ws::Message, Filter};
+use warp::Filter;
 
 #[path = "../model.rs"]
 mod model;
@@ -86,37 +86,18 @@ async fn handle_ocpp_message(charge_point_id: &str, message: &str) {
     }
 }
 
-async fn handle_boot_notification(charge_point_id: &str, payload: Value) {
+async fn handle_boot_notification(_charge_point_id: &str, payload: Value) {
     let request: BootNotificationRequest = serde_json::from_value(payload).unwrap();
     let mut interval = 30;
     if request.iccid.is_none() {
         interval = 20;
     }
 
-    let message = serde_json::to_string(&BootNotificationResponse {
+    let _message = serde_json::to_string(&BootNotificationResponse {
         current_time: chrono::Utc::now(),
         interval: interval,
         status: rust_ocpp::v1_6::types::RegistrationStatus::Accepted,
     })
     .unwrap();
-    send_message(charge_point_id, &message).await;
-}
-
-async fn send_message(charge_point_id: &str, message: &str) {
-    // let mut cps = charge_points.lock().await;
-    // if let Some(cp) = cps.get_mut(charge_point_id) {
-    //     if let Err(e) = cp.sender.send(Message::Text(message.to_string())).await {
-    //         eprintln!("Error sending message to {}: {}", charge_point_id, e);
-    //     }
-    //     println!("succeed sending message");
-    // }
-}
-
-fn test() -> Option<String> {
-    let result = check()?;
-    Some(result)
-}
-
-fn check() -> Option<String> {
-    Some(String::new())
+    // send_message(charge_point_id, &message).await;
 }

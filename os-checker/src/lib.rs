@@ -5,8 +5,8 @@ use std::{
     path::Path,
 };
 
-type GenericError = Box<dyn Error + Send + Sync + 'static>;
-type GenericResult<T> = Result<T, GenericError>;
+// type GenericError = Box<dyn Error + Send + Sync + 'static>;
+// type GenericResult<T> = Result<T, GenericError>;
 
 pub fn support_architecture_v3() -> Result<bool, impl Error> {
     let path = Path::new("/proc/cpuinfo");

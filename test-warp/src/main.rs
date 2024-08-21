@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 #[derive(Deserialize)]
@@ -6,11 +6,11 @@ struct PostData {
     message: String,
 }
 
-#[derive(Serialize)]
-struct ResponseData {
-    status: String,
-    message: String,
-}
+// #[derive(Serialize)]
+// struct ResponseData {
+//     status: String,
+//     message: String,
+// }
 
 #[tokio::main]
 async fn main() {
@@ -28,10 +28,10 @@ async fn main() {
 async fn handle_post(post_data: PostData) -> Result<impl Reply, Rejection> {
     println!("Received message: {}", post_data.message);
 
-    let response = ResponseData {
-        status: "success".to_string(),
-        message: format!("Received: {}", post_data.message),
-    };
+    // let response = ResponseData {
+    //     status: "success".to_string(),
+    //     message: format!("Received: {}", post_data.message),
+    // };
 
     Ok(warp::reply::with_status("Question added", StatusCode::OK))
 }
