@@ -4,6 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["http-client", "http-server", "os-checker", "test-json", "websocket"]
+members = [
+    "books",
+    "http-client",
+    "http-server", "one-zero-four-client",
+    "os-checker", "server",
+    "test-json", "test-warp",
+    "websocket",
+]
 
 [dependencies]

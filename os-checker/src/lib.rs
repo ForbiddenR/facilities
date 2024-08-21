@@ -1,10 +1,14 @@
 use std::{
+    error::Error,
     fs::File,
     io::{self, BufRead},
     path::Path,
 };
 
-pub fn support_architecture_v3() -> io::Result<bool> {
+type GenericError = Box<dyn Error + Send + Sync + 'static>;
+type GenericResult<T> = Result<T, GenericError>;
+
+pub fn support_architecture_v3() -> Result<bool, impl Error> {
     let path = Path::new("/proc/cpuinfo");
     let file = File::open(path)?;
     let reader = io::BufReader::new(file);

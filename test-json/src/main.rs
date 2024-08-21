@@ -24,7 +24,7 @@ fn main() {
     let data = r#"{"action":"boot","payload":{"chargePointVender":"vendor","iccid":"4343444"}}"#;
     let result: Message = serde_json::from_str(data).unwrap();
 
-    let boot_req: BootNotificationRequest = serde_json::from_value(result.payload).unwrap();
+    let boot_req  = serde_json::from_value::<BootNotificationRequest>(result.payload).unwrap();
     println!("{:?}", boot_req);
 
     // let boot = BootNotification {

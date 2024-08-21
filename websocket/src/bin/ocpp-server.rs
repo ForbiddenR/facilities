@@ -1,86 +1,58 @@
 use std::{collections::HashMap, sync::Arc};
 
-use futures_util::{stream::SplitSink, SinkExt, StreamExt};
+use futures_util::{SinkExt, StreamExt};
 use rust_ocpp::v1_6::messages::boot_notification::{
     BootNotificationRequest, BootNotificationResponse,
 };
 use serde_json::Value;
-use tokio::{
-    net::{TcpListener, TcpStream},
-    sync::Mutex,
-};
-use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
+use tokio::sync::{mpsc, Mutex};
+use warp::{filters::ws::Message, Filter};
 
 #[path = "../model.rs"]
 mod model;
 
-type ChargePoints = Arc<Mutex<HashMap<String, ChargePoint>>>;
-
-struct ChargePoint {
-    id: String,
-    sender: SplitSink<WebSocketStream<TcpStream>, Message>,
-}
+type ChargerConnections = Arc<Mutex<HashMap<String, mpsc::UnboundedSender<String>>>>;
 
 #[tokio::main]
 async fn main() {
-    let addr = "127.0.0.1:8080";
-    let listener = TcpListener::bind(addr).await.expect("Failed to bind");
-    println!("OCPP server listening on: {}", addr);
+    let connections: ChargerConnections = Arc::new(Mutex::new(HashMap::new()));
 
-    let charge_points: ChargePoints = Arc::new(Mutex::new(HashMap::new()));
-
-    while let Ok((stream, _)) = listener.accept().await {
-        let charge_points = charge_points.clone();
-        tokio::spawn(handle_connection(stream, charge_points));
-    }
-}
-
-async fn handle_connection(stream: TcpStream, charge_points: ChargePoints) {
-    let addr = stream
-        .peer_addr()
-        .expect("Connected streams should have a peer address");
-    println!("New Websocket connection: {}", addr);
-
-    let ws_stream = accept_async(stream)
-        .await
-        .expect("Failed to accept websocket");
-
-    let (ws_sender, mut ws_receiver) = ws_stream.split();
-
-    let charge_point_id = match ws_receiver.next().await {
-        Some(Ok(msg)) => {
-            if let Ok(text) = msg.to_text() {
-                String::from(text.trim())
-            } else {
-                println!("Invalid charge point ID");
-                return;
-            }
-        }
-        _ => {
-            println!("Failed to receive charge point ID");
-            return;
-        }
-    };
-
-    println!("Charge Point connected: {}", charge_point_id);
-
-    {
-        let mut cps = charge_points.lock().await;
-        cps.insert(
-            charge_point_id.clone(),
-            ChargePoint {
-                id: charge_point_id.clone(),
-                sender: ws_sender,
+    let ocpp_route = warp::path("ocpp")
+        .and(warp::path::param())
+        .and(warp::ws())
+        .and(warp::any().map(move || connections.clone()))
+        .map(
+            |charger_id: String, ws: warp::ws::Ws, connections: ChargerConnections| {
+                ws.on_upgrade(|socket| handle_ocpp_connection(socket, charger_id, connections))
             },
         );
-    }
 
-    while let Some(msg) = ws_receiver.next().await {
-        match msg {
+    println!("OCPP server starting");
+    warp::serve(ocpp_route).run(([0, 0, 0, 0], 12000)).await;
+}
+
+async fn handle_ocpp_connection(
+    ws: warp::ws::WebSocket,
+    charger_id: String,
+    connections: ChargerConnections,
+) {
+    println!("New websocket connection from charger: {}", charger_id);
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    connections.lock().await.insert(charger_id.clone(), tx);
+
+    let (mut ws_tx, mut ws_rx) = ws.split();
+
+    tokio::task::spawn(async move {
+        while let Some(message) = rx.recv().await {
+            ws_tx.send(warp::ws::Message::text(message)).await.unwrap();
+        }
+    });
+
+    while let Some(result) = ws_rx.next().await {
+        match result {
             Ok(msg) => {
-                if msg.is_text() {
-                    let text = msg.to_text().unwrap();
-                    handle_ocpp_message(&charge_point_id, text, charge_points.clone()).await;
+                if let Ok(text) = msg.to_str() {
+                    handle_ocpp_message(&charger_id, text).await;
                 }
             }
             Err(e) => {
@@ -89,13 +61,9 @@ async fn handle_connection(stream: TcpStream, charge_points: ChargePoints) {
             }
         }
     }
-
-    println!("Charge Point disconnected: {}", charge_point_id);
-    let mut cps = charge_points.lock().await;
-    cps.remove(&charge_point_id);
 }
 
-async fn handle_ocpp_message(charge_point_id: &str, message: &str, charge_points: ChargePoints) {
+async fn handle_ocpp_message(charge_point_id: &str, message: &str) {
     let parsed: Value = serde_json::from_str(message).unwrap();
     if let Value::Array(array) = parsed {
         if array.len() >= 3 {
@@ -107,12 +75,7 @@ async fn handle_ocpp_message(charge_point_id: &str, message: &str, charge_points
                 2 => {
                     match action {
                         "BootNotification" => {
-                            handle_boot_notification(
-                                charge_point_id,
-                                array[3].clone(),
-                                charge_points,
-                            )
-                            .await
+                            handle_boot_notification(charge_point_id, array[3].clone()).await
                         }
                         _ => println!("Unsupported action: {}", action),
                     };
@@ -123,11 +86,7 @@ async fn handle_ocpp_message(charge_point_id: &str, message: &str, charge_points
     }
 }
 
-async fn handle_boot_notification(
-    charge_point_id: &str,
-    payload: Value,
-    charge_points: ChargePoints,
-) {
+async fn handle_boot_notification(charge_point_id: &str, payload: Value) {
     let request: BootNotificationRequest = serde_json::from_value(payload).unwrap();
     let mut interval = 30;
     if request.iccid.is_none() {
@@ -140,14 +99,24 @@ async fn handle_boot_notification(
         status: rust_ocpp::v1_6::types::RegistrationStatus::Accepted,
     })
     .unwrap();
-    send_message(charge_point_id, &message, charge_points).await;
+    send_message(charge_point_id, &message).await;
 }
 
-async fn send_message(charge_point_id: &str, message: &str, charge_points: ChargePoints) {
-    let mut cps = charge_points.lock().await;
-    if let Some(cp) = cps.get_mut(charge_point_id) {
-        if let Err(e) = cp.sender.send(Message::Text(message.to_string())).await {
-            eprintln!("Error sending message to {}: {}", charge_point_id, e);
-        }
-    }
+async fn send_message(charge_point_id: &str, message: &str) {
+    // let mut cps = charge_points.lock().await;
+    // if let Some(cp) = cps.get_mut(charge_point_id) {
+    //     if let Err(e) = cp.sender.send(Message::Text(message.to_string())).await {
+    //         eprintln!("Error sending message to {}: {}", charge_point_id, e);
+    //     }
+    //     println!("succeed sending message");
+    // }
+}
+
+fn test() -> Option<String> {
+    let result = check()?;
+    Some(result)
+}
+
+fn check() -> Option<String> {
+    Some(String::new())
 }
